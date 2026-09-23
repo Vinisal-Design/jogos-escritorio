@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Fortune Fórmula</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Nunito:wght@800;900&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; overflow: hidden; }
+  body { background: #2a0000; user-select: none; }
+
+  /* Palco com as medidas exatas da arte (941×1672), escalado pra caber na tela */
+  .stage {
+    position: absolute; left: 50%; top: 50%;
+    width: 941px; height: 1672px;
+    transform-origin: 0 0;
+    background: url(assets/bg.png) no-repeat 0 0 / 941px 1672px;
+    overflow: hidden;
+  }
+  .abs { position: absolute; }
+
+  .cell { position: absolute; overflow: hidden; display: flex; align-items: center; justify-content: center; }
+  .cell img { width: 100%; height: 100%; object-fit: contain; object-position: center top; display: block; }
+  #bannerFront { left: 0; top: 1030px; width: 941px; height: 270px; pointer-events: none; }
+  .cell.spinning img { filter: blur(4px) brightness(1.08); animation: roll .09s linear infinite; }
+  @keyframes roll { from { transform: translateY(-35%); } to { transform: translateY(35%); } }
+  .cell.stop img { animation: land .28s cubic-bezier(.3,1.6,.5,1); }
+  @keyframes land { from { transform: translateY(-18%); } to { transform: none; } }
+  .cell.near { animation: glow .45s ease-in-out 4; }
+  @keyframes glow {
+    50% { filter: drop-shadow(0 0 14px #ffe066) drop-shadow(0 0 28px #ff3b1f); transform: scale(1.05); }
+  }
+
+  /* Texto do banner */
+  #banner { left: 120px; top: 1080px; width: 700px; height: 125px; display: flex; align-items: center; justify-content: center; }
+  #banner img { position: absolute; left: 46px; top: 5px; width: 609px; height: 115px; }
+  #banner .txt {
+    font-family: "Lilita One", "Arial Black", sans-serif; font-size: 96px; letter-spacing: 1px;
+    background: linear-gradient(180deg, #fff6b0 0%, #ffd23a 45%, #e8961a 75%, #c96a0a 100%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    -webkit-text-stroke: 3px #7a1200;
+    filter: drop-shadow(0 5px 0 #6a0e00) drop-shadow(0 0 10px rgba(255,200,60,.45));
+    white-space: nowrap;
+  }
+  #banner.pop > * { animation: pop .35s cubic-bezier(.2,1.7,.4,1); }
+  @keyframes pop { from { transform: scale(.3); opacity: 0; } to { transform: none; opacity: 1; } }
+  #banner.pulse .txt { animation: breathe .8s ease-in-out infinite; }
+  @keyframes breathe { 50% { transform: scale(1.04); } }
+
+  /* Valores */
+  .val {
+    font-family: "Nunito", "Arial Rounded MT Bold", sans-serif; font-weight: 800; font-size: 41px;
+    background: linear-gradient(180deg, #fff4c8 0%, #f9dd8e 55%, #eec26a 100%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 2px 0 rgba(60,0,0,.8));
+    text-align: center; white-space: nowrap; line-height: 1;
+  }
+  #saldo { left: 84px; top: 1364px; width: 240px; }
+  #aposta { left: 614px; top: 1360px; width: 240px; font-size: 39px; }
+  .val.drop { animation: drop .35s; }
+  @keyframes drop { 30% { transform: translateX(-5px); } 60% { transform: translateX(5px); } }
+
+  /* Botão de giro (recortado da própria arte) */
+  #spin {
+    left: 343px; top: 1253px; width: 250px; height: 250px; border-radius: 50%;
+    background: url(assets/btn-spin.png) 0 0 / 250px 250px; border: 0; cursor: pointer;
+    transition: transform .08s, filter .15s;
+  }
+  #spin img { position: absolute; left: 72px; top: 167px; width: 108px; height: 42px; pointer-events: none; }
+  #spin:hover { filter: brightness(1.08) drop-shadow(0 0 18px rgba(255,210,60,.8)); }
+  #spin:active { transform: scale(.94); }
+  #spin:disabled { cursor: wait; filter: brightness(.85) saturate(.8); }
+  #spin:disabled::after {
+    content: ""; position: absolute; inset: 18px; border-radius: 50%;
+    border: 6px solid transparent; border-top-color: #fff6b0; border-right-color: #ffd23a;
+    animation: spinring .6s linear infinite;
+  }
+  @keyframes spinring { to { transform: rotate(360deg); } }
+
+  .hit { position: absolute; border: 0; background: transparent; border-radius: 10px; cursor: pointer; }
+  .hit:active { background: rgba(255,240,180,.25); }
+  #menos { left: 646px; top: 1406px; width: 81px; height: 54px; }
+  #mais  { left: 748px; top: 1406px; width: 81px; height: 54px; }
+
+  .coin { position: absolute; top: -80px; width: 64px; height: 64px; border-radius: 50%; pointer-events: none;
+    background: radial-gradient(circle at 35% 30%, #fff6b0, #ffd23a 45%, #b87a0a);
+    box-shadow: inset 0 0 0 5px #e8a81a, 0 4px 10px rgba(0,0,0,.4); animation: fall linear forwards; z-index: 20; }
+  .coin::after { content: ""; position: absolute; left: 24px; top: 24px; width: 16px; height: 16px; background: #a8650a; border-radius: 2px; }
+  @keyframes fall { to { transform: translateY(1800px) rotate(900deg); } }
+
+  /* Saldo zerado */
+  #overlay {
+    position: absolute; inset: 0; z-index: 30; display: none;
+    background: radial-gradient(circle at 50% 45%, rgba(90,0,0,.82), rgba(20,0,0,.95));
+    align-items: center; justify-content: center;
+  }
+  #overlay.show { display: flex; }
+  .panel {
+    width: 760px; padding: 50px 50px 44px; text-align: center; border-radius: 34px;
+    background: linear-gradient(180deg, #d0140f, #8a0000);
+    border: 8px solid #ffd23a; box-shadow: 0 0 0 6px #7a1200, 0 0 60px rgba(255,200,60,.5);
+  }
+  .panel img { width: 300px; height: auto; margin: -170px auto 10px; display: block; filter: drop-shadow(0 10px 20px rgba(0,0,0,.5)); }
+  .panel h2 { font-family: "Lilita One", sans-serif; font-size: 92px; line-height: 1;
+    background: linear-gradient(180deg, #fff6b0, #ffd23a 50%, #d9820f); -webkit-background-clip: text; background-clip: text; color: transparent;
+    -webkit-text-stroke: 3px #6a0e00; filter: drop-shadow(0 5px 0 #5a0a00); }
+  .panel p { font-family: "Nunito", sans-serif; font-weight: 900; font-size: 34px; color: #fff3d9; margin: 22px 0 34px; line-height: 1.3; }
+  .panel .pix {
+    font-family: "Lilita One", sans-serif; font-size: 50px; color: #fff; cursor: pointer;
+    padding: 22px 50px; border-radius: 60px; border: 6px solid #fff6b0;
+    background: linear-gradient(180deg, #2bd97c, #0a8a45); box-shadow: 0 10px 0 #05532a;
+  }
+  .panel .pix:active { transform: translateY(6px); box-shadow: 0 4px 0 #05532a; }
+  .panel .sair { display: block; margin: 30px auto 0; background: none; border: 0; cursor: pointer;
+    font-family: "Nunito", sans-serif; font-weight: 900; font-size: 26px; color: rgba(255,243,217,.6); text-decoration: underline; }
+</style>
+</head>
+<body>
+<div class="stage" id="stage">
+  <div id="cells"></div>
+  <img class="abs" id="bannerFront" src="assets/banner-front.png" alt="">
+
+  <div class="abs" id="banner"><span class="txt">BOA SORTE!</span></div>
+
+  <div class="abs val" id="saldo">R$ 100,00</div>
+  <div class="abs val" id="aposta">R$ 10,00</div>
+
+  <button class="abs" id="spin" aria-label="Girar"><img src="assets/txt-spin.png" alt=""></button>
+  <button class="hit" id="menos" aria-label="Diminuir aposta"></button>
+  <button class="hit" id="mais" aria-label="Aumentar aposta"></button>
+
+  <div id="overlay">
+    <div class="panel">
+      <img src="assets/sym-p1.png" alt="">
+      <h2>SALDO ZERADO</h2>
+      <p id="overlayMsg">Faltou só um pouquinho! O próximo giro é o da sorte, confia.</p>
+      <button class="pix" id="depositar">DEPOSITAR R$ 100 NO PIX</button>
+      <button class="sair" id="desistir">desistir (ninguém desiste)</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  // Células medidas na arte original [x, y, largura, altura]
+  const CELLS = [
+    [117, 407, 235, 231], [359, 407, 221, 231], [588, 407, 235, 231],
+    [111, 642, 238, 221], [357, 642, 225, 221], [590, 642, 239, 221],
+    [104, 867, 243, 221], [355, 867, 230, 221], [593, 867, 242, 221],
+  ];
+  const SYMBOLS = ['p1', 'p2', 'p3', 'p4', 'ouro', 'ouro2', 'env'].map(id => ({ id, src: `assets/sym-${id}.png` }));
+  // Estado inicial = exatamente a tela aprovada
+  const START = ['p1', 'ouro', 'p4', 'env', 'p2', 'ouro2', 'p3', 'env', 'p1'];
+  const LINES = [[0,1,2],[3,4,5],[6,7,8],[0,4,8],[2,4,6]];
+  const BETS = [1, 2, 5, 10, 20, 50, 100];
+  const NEAR_MSGS = ['QUASE!', 'FOI POR POUCO!', 'AGORA VAI!'];
+
+  const $ = id => document.getElementById(id);
+  const brl = v => 'R$ ' + v.toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  const wait = ms => new Promise(r => setTimeout(r, ms));
+  const rand = () => SYMBOLS[Math.floor(Math.random() * SYMBOLS.length)];
+  const byId = id => SYMBOLS.find(s => s.id === id);
+
+  // Pré-carrega os símbolos
+  SYMBOLS.forEach(s => { const i = new Image(); i.src = s.src; });
+
+  // Escala do palco
+  const stage = $('stage');
+  function fit() {
+    const s = Math.min(innerWidth / 941, innerHeight / 1672);
+    stage.style.transform = `scale(${s}) translate(-50%, -50%)`;
+  }
+  addEventListener('resize', fit); fit();
+
+  // Monta as células
+  const cells = CELLS.map(([x, y, w, h], i) => {
+    const c = document.createElement('div');
+    c.className = 'cell';
+    Object.assign(c.style, { left: x + 'px', top: y + 'px', width: w + 'px', height: h + 'px' });
+    c.innerHTML = `<img src="${byId(START[i]).src}" alt="">`;
+    $('cells').appendChild(c);
+    return c;
+  });
+  const setSym = (c, s) => { c.firstChild.src = s.src; c.dataset.sym = s.id; };
+
+  // Resultado viciado: nenhuma das 5 linhas fecha. Às vezes força um "quase".
+  function riggedResult() {
+    let r;
+    do {
+      r = Array.from({ length: 9 }, rand);
+      r.near = null;
+      if (Math.random() < 0.55) {
+        const line = LINES[Math.floor(Math.random() * LINES.length)];
+        const s = rand();
+        let other; do { other = rand(); } while (other.id === s.id);
+        r[line[0]] = s; r[line[1]] = s; r[line[2]] = other;
+        r.near = line;
+      }
+    } while (LINES.some(([a, b, c]) => r[a].id === r[b].id && r[b].id === r[c].id));
+    return r;
+  }
+
+  // Som
+  let actx;
+  function beep(freq, dur = .06, type = 'square', vol = .05) {
+    try {
+      actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+      const o = actx.createOscillator(), g = actx.createGain();
+      o.type = type; o.frequency.value = freq; g.gain.value = vol;
+      o.connect(g); g.connect(actx.destination);
+      o.start(); g.gain.exponentialRampToValueAtTime(.0001, actx.currentTime + dur);
+      o.stop(actx.currentTime + dur);
+    } catch (e) {}
+  }
+  const sadTrombone = () => [392, 370, 349, 311].forEach((f, i) => setTimeout(() => beep(f, i === 3 ? .8 : .35, 'sawtooth', .06), i * 380));
+
+  // Banner
+  function banner(content, pulse = false) {
+    const b = $('banner');
+    b.className = 'abs';
+    b.innerHTML = content === 'PERDEU'
+      ? '<img src="assets/txt-perdeu.png" alt="VOCÊ PERDEU!">'
+      : `<span class="txt">${content}</span>`;
+    void b.offsetWidth;
+    b.classList.add('pop');
+    if (pulse) b.classList.add('pulse');
+  }
+
+  let saldo = 100, betIdx = 3, giros = 0, depositado = 100, spinning = false;
+  function updateUI() { $('saldo').textContent = brl(saldo); $('aposta').textContent = brl(BETS[betIdx]); }
+
+  function coinRain(n = 18) {
+    for (let i = 0; i < n; i++) {
+      const c = document.createElement('div');
+      c.className = 'coin';
+      c.style.left = Math.random() * 880 + 'px';
+      c.style.animationDuration = 1.3 + Math.random() * 1.2 + 's';
+      c.style.animationDelay = Math.random() * .5 + 's';
+      stage.appendChild(c);
+      setTimeout(() => c.remove(), 3200);
+    }
+  }
+
+  const showBroke = () => {
+    $('overlayMsg').textContent = giros > 25
+      ? `Já foram ${giros} giros e ${brl(depositado)} depositados. Estatisticamente a sorte tá chegando (não tá).`
+      : 'Faltou só um pouquinho! O próximo giro é o da sorte, confia.';
+    $('overlay').classList.add('show');
+  };
+
+  async function spin() {
+    if (spinning) return;
+    if (saldo <= 0) return showBroke();
+    if (BETS[betIdx] > saldo) {
+      while (betIdx > 0 && BETS[betIdx] > saldo) betIdx--;
+      updateUI();
+      if (BETS[betIdx] > saldo) { saldo = 0; updateUI(); return showBroke(); }
+      return banner('APOSTA MENOR');
+    }
+
+    spinning = true; $('spin').disabled = true;
+    saldo = Math.round((saldo - BETS[betIdx]) * 100) / 100; giros++;
+    const sv = $('saldo'); sv.classList.remove('drop'); void sv.offsetWidth; sv.classList.add('drop');
+    updateUI();
+    banner('BOA SORTE!', true);
+
+    const result = riggedResult();
+    cells.forEach(c => { c.classList.remove('stop', 'near'); c.classList.add('spinning'); });
+    const shuffler = setInterval(() => {
+      cells.forEach(c => c.classList.contains('spinning') && setSym(c, rand()));
+      beep(650 + Math.random() * 300, .03, 'square', .02);
+    }, 75);
+
+    const stopCol = col => {
+      [col, col + 3, col + 6].forEach(i => {
+        cells[i].classList.remove('spinning');
+        setSym(cells[i], result[i]);
+        void cells[i].offsetWidth;
+        cells[i].classList.add('stop');
+      });
+      beep(200, .12, 'triangle', .09);
+    };
+    await wait(750); stopCol(0);
+    await wait(380); stopCol(1);
+    await wait(result.near ? 1400 : 380); stopCol(2);  // suspense no "quase"
+    clearInterval(shuffler);
+
+    await wait(200);
+    if (result.near) {
+      result.near.forEach(i => cells[i].classList.add('near'));
+      banner(NEAR_MSGS[Math.floor(Math.random() * NEAR_MSGS.length)]);
+      await wait(1100);
+    }
+    banner('PERDEU');
+    sadTrombone();
+
+    await wait(900);
+    spinning = false; $('spin').disabled = false;
+    if (saldo <= 0) setTimeout(showBroke, 600);
+  }
+
+  $('spin').addEventListener('click', spin);
+  addEventListener('keydown', e => { if (e.code === 'Space') { e.preventDefault(); spin(); } });
+  $('menos').onclick = () => { if (!spinning && betIdx > 0) { betIdx--; updateUI(); beep(500); } };
+  $('mais').onclick = () => { if (!spinning && betIdx < BETS.length - 1) { betIdx++; updateUI(); beep(800); } };
+  $('depositar').onclick = () => {
+    saldo += 100; depositado += 100;
+    $('overlay').classList.remove('show');
+    updateUI(); coinRain();
+    [523, 659, 784, 1047].forEach((f, i) => setTimeout(() => beep(f, .12, 'square', .05), i * 90));
+    banner('BÔNUS LIBERADO!');
+  };
+  $('desistir').onclick = () => {
+    $('overlayMsg').textContent = 'Tem certeza? O tigrin ficou triste. Um último depósito, vai.';
+    $('desistir').style.visibility = 'hidden';
+    setTimeout(() => $('desistir').style.visibility = '', 4000);
+  };
+
+  updateUI();
+</script>
+</body>
+</html>

@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#f3a64a">
+<meta name="mobile-web-app-capable" content="yes">
+<title>Sem Reunião!</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Lilita+One&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    height: 100%; overflow: hidden; background: #2b1a0e;
+    touch-action: none; overscroll-behavior: none;
+    -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
+  }
+  /* Faixas acima/abaixo do palco em telas mais altas que 9:16: o próprio fundo, desfocado */
+  body::before {
+    content: ""; position: fixed; inset: -40px;
+    background: url(assets/bg.png) center / cover; filter: blur(24px) brightness(.8);
+  }
+
+  /* Palco nas medidas da arte (941×1672), escalado pra caber na tela */
+  #stage {
+    position: absolute; left: 50%; top: 50%; width: 941px; height: 1672px;
+    transform-origin: 0 0; overflow: hidden;
+    background: url(assets/bg.png) 0 0 / 941px 1672px;
+  }
+  #stage.shake { animation: shake .3s; }
+  @keyframes shake { 20% { translate: -10px 0; } 40% { translate: 10px 0; } 60% { translate: -6px 0; } 80% { translate: 6px 0; } }
+  .abs { position: absolute; pointer-events: none; }
+  img { -webkit-user-drag: none; }
+
+  /* Cubículo: recorta o colega na borda de cima do monitor */
+  .hole { position: absolute; overflow: hidden; pointer-events: none; }
+  .person {
+    position: absolute; left: 50%; bottom: 0; transform: translate(-50%, 101%);
+    transition: transform .16s cubic-bezier(.2,.9,.3,1.25); will-change: transform;
+  }
+  .hole.up .person { transform: translate(-50%, 0); }
+  .hole.down .person { transition-timing-function: ease-in; transition-duration: .14s; }
+  .hole.bonk .person { animation: wobble .4s ease-in-out; }
+  @keyframes wobble { 25% { rotate: -7deg; } 50% { rotate: 6deg; } 75% { rotate: -3deg; } }
+
+  .bubble { transform-origin: 15% 100%; transform: scale(0); transition: transform .18s cubic-bezier(.2,1.6,.4,1); }
+  .bubble.show { transform: scale(1); }
+
+  .pof { transform: translate(-50%, -50%) scale(0); }
+  .pof.show { animation: pof .45s ease-out forwards; }
+  @keyframes pof { 0% { transform: translate(-50%,-50%) scale(.3) rotate(-10deg); opacity: 1; }
+    35% { transform: translate(-50%,-50%) scale(1.1) rotate(4deg); } 100% { transform: translate(-50%,-50%) scale(1) rotate(0); opacity: 0; } }
+
+  .chicken { transform-origin: 12% 18%; opacity: 0; z-index: 10; }
+  .chicken.swing { animation: swing .32s ease-out forwards; }
+  @keyframes swing { 0% { transform: rotate(-55deg); opacity: 1; } 30% { transform: rotate(6deg); opacity: 1; }
+    45% { transform: rotate(-4deg); } 100% { transform: rotate(-20deg); opacity: 0; } }
+
+  .float { font-family: "Lilita One", sans-serif; font-size: 58px; color: #ffe14a; -webkit-text-stroke: 3px #7a3a00;
+    text-shadow: 0 5px 0 #7a3a00; transform: translate(-50%, -50%); animation: rise .7s ease-out forwards; z-index: 11; white-space: nowrap; }
+  @keyframes rise { to { transform: translate(-50%, -160%); opacity: 0; } }
+
+  /* HUD */
+  .hud { font-family: "Lilita One", sans-serif; line-height: 1; }
+  #lbl { left: 172px; top: 352px; font-size: 24px; color: #fff; letter-spacing: .5px; }
+  #score { left: 172px; top: 376px; font-size: 42px; color: #ffd83a; text-shadow: 0 3px 0 #0b1f6b; }
+  #time { left: 718px; top: 362px; width: 132px; text-align: center; font-size: 50px; color: #fff; text-shadow: 0 3px 0 #0b1f6b; }
+  #time.hurry { color: #ff6b5a; animation: beat .5s infinite; }
+  @keyframes beat { 50% { transform: scale(1.12); } }
+  .cafe { transition: filter .3s, opacity .3s, transform .3s; }
+  .cafe.lost { filter: grayscale(1) brightness(.7); opacity: .45; transform: scale(.82) rotate(-12deg); }
+
+  #hint { left: 0; width: 941px; top: 1430px; text-align: center; font-family: "Lilita One", sans-serif; font-size: 44px;
+    color: #fff; -webkit-text-stroke: 2px #6b3200; text-shadow: 0 4px 0 #6b3200; opacity: 0; transition: opacity .3s; }
+  #hint.show { opacity: 1; }
+
+  #jogar { left: 211px; top: 1377px; width: 520px; height: 211px; pointer-events: auto; cursor: pointer;
+    background: url(assets/btn-jogar.png) 0 0 / 520px 211px; border: 0; transition: transform .1s; z-index: 20; }
+  #jogar:active { transform: scale(.94); }
+  #jogar.hide { display: none; }
+  #jogar.pulse { animation: breathe 1.2s ease-in-out infinite; }
+  @keyframes breathe { 50% { transform: scale(1.05); } }
+
+  /* Fim de jogo */
+  #end { left: 90px; top: 640px; width: 761px; padding: 46px 40px 40px; text-align: center; border-radius: 40px; z-index: 19;
+    background: linear-gradient(180deg, #2f6bff, #1636a8); border: 8px solid #fff; box-shadow: 0 0 0 6px #0b1f6b, 0 20px 50px rgba(0,0,0,.5);
+    font-family: "Lilita One", sans-serif; color: #fff; transform: scale(0); transition: transform .3s cubic-bezier(.2,1.5,.4,1); }
+  #end.show { transform: scale(1); }
+  #end h2 { font-size: 76px; line-height: 1; color: #ffd83a; -webkit-text-stroke: 3px #0b1f6b; text-shadow: 0 6px 0 #0b1f6b; }
+  #end p { font-size: 34px; margin-top: 18px; line-height: 1.25; font-family: system-ui, sans-serif; font-weight: 800; }
+  #end .big { font-family: "Lilita One", sans-serif; font-size: 96px; color: #fff; margin-top: 16px; text-shadow: 0 6px 0 #0b1f6b; }
+  #end .rec { font-size: 32px; color: #bcd0ff; margin-top: 4px; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <div id="holes"></div>
+  <div id="fx"></div>
+
+  <div class="abs hud" id="lbl">PONTOS</div>
+  <div class="abs hud" id="score">0</div>
+  <div class="abs hud" id="time">1:00</div>
+  <img class="abs cafe" src="assets/cafe-0.png" style="left:368px;top:340px;width:78px" alt="">
+  <img class="abs cafe" src="assets/cafe-1.png" style="left:446px;top:340px;width:76px" alt="">
+  <img class="abs cafe" src="assets/cafe-2.png" style="left:522px;top:340px;width:78px" alt="">
+
+  <div class="abs" id="hint">TOCA NELES ANTES DA CALL!</div>
+
+  <div class="abs" id="end">
+    <h2 id="endTitle">REUNIÃO MARCADA!</h2>
+    <p id="endMsg">Você foi puxado pra uma call de 2 horas.</p>
+    <div class="big" id="endScore">0</div>
+    <div class="rec" id="endRec">recorde: 0</div>
+  </div>
+
+  <button class="abs pulse" id="jogar" aria-label="Jogar"></button>
+</div>
+
+<script>
+  const W = 941, H = 1672;
+  const $ = id => document.getElementById(id);
+  const stage = $('stage');
+
+  // Cubículos medidos na arte: faixa entre as divisórias e borda de cima do monitor
+  const HOLES = [
+    { x0: 30,  x1: 350, mon: 718,  h: 282 }, { x0: 352, x1: 592, mon: 707,  h: 282 }, { x0: 596, x1: 912, mon: 719,  h: 282 },
+    { x0: 10,  x1: 335, mon: 1004, h: 305 }, { x0: 340, x1: 612, mon: 953,  h: 305 }, { x0: 618, x1: 930, mon: 998,  h: 305 },
+    { x0: 0,   x1: 305, mon: 1228, h: 335 }, { x0: 310, x1: 635, mon: 1228, h: 335 }, { x0: 640, x1: 941, mon: 1229, h: 335 },
+  ];
+  const SHOW = 0.67;  // fração do colega que aparece acima do monitor
+  const CHARS = ['p1', 'p2', 'p3', 'p4'];
+  const BUBBLE = { p1: [126, 108], p2: [138, 110], p3: [138, 107], p4: [132, 106] };
+
+  // Pré-carrega e guarda a proporção de cada sprite
+  const ratio = {};
+  const load = src => new Promise(r => { const i = new Image(); i.onload = () => r(i); i.onerror = () => r(i); i.src = src; });
+  const ready = Promise.all(CHARS.flatMap(c => [c, c + '-bonk']).concat(['galinha', 'pof'])
+    .map(n => load(`assets/${n}.png`).then(i => { ratio[n] = i.naturalWidth / i.naturalHeight || 1; })));
+
+  // Escala do palco
+  function fit() {
+    const s = Math.min(innerWidth / W, innerHeight / H);
+    stage.style.transform = `scale(${s}) translate(-50%, -50%)`;
+    stage.dataset.s = s;
+  }
+  addEventListener('resize', fit); fit();
+
+  // Monta os cubículos
+  const holes = HOLES.map(g => {
+    const el = document.createElement('div');
+    el.className = 'hole';
+    const top = g.mon - g.h * SHOW - 10;
+    Object.assign(el.style, { left: g.x0 + 'px', width: (g.x1 - g.x0) + 'px', top: top + 'px', height: (g.mon - top) + 'px' });
+    const img = document.createElement('img');
+    img.className = 'person'; img.alt = '';
+    img.style.height = g.h + 'px';
+    img.style.bottom = -(g.h * (1 - SHOW)) + 'px';
+    el.appendChild(img);
+    $('holes').appendChild(el);
+    const bubble = document.createElement('img');
+    bubble.className = 'abs bubble'; bubble.alt = '';
+    $('fx').appendChild(bubble);
+    return { ...g, el, img, bubble, cx: (g.x0 + g.x1) / 2, state: 'idle', char: null, t: 0 };
+  });
+
+  // Geometria do colega visível num cubículo
+  function box(h) {
+    const w = h.h * (ratio[h.char] || .95);
+    return { left: h.cx - w / 2, right: h.cx + w / 2, top: h.mon - h.h * SHOW, w };
+  }
+  function placeBubble(h) {
+    const b = box(h), [bw, bh] = BUBBLE[h.char];
+    const left = Math.min(b.right - 15, W - bw - 8);
+    Object.assign(h.bubble.style, { left: left + 'px', top: (b.top - 5) + 'px', width: bw + 'px', height: bh + 'px' });
+    h.bubble.src = `assets/bal-${h.char}.png`;
+  }
+
+  function popUp(h, char) {
+    h.char = char; h.state = 'up'; h.t = performance.now();
+    h.img.src = `assets/${char}.png`;
+    h.el.classList.remove('down', 'bonk');
+    void h.el.offsetWidth;
+    h.el.classList.add('up');
+    placeBubble(h);
+    setTimeout(() => h.state === 'up' && h.char === char && h.bubble.classList.add('show'), 120);
+  }
+  function goDown(h) {
+    h.state = 'idle';
+    h.bubble.classList.remove('show');
+    h.el.classList.add('down'); h.el.classList.remove('up');
+  }
+
+  // Efeitos
+  function spawnFx(cls, src, x, y, w, extra = {}) {
+    const el = document.createElement(src ? 'img' : 'div');
+    el.className = 'abs ' + cls;
+    if (src) { el.src = src; el.alt = ''; }
+    Object.assign(el.style, { left: x + 'px', top: y + 'px', width: w ? w + 'px' : '' }, extra);
+    $('fx').appendChild(el);
+    return el;
+  }
+  function chickenAt(x, y) {
+    const w = 270, h = w / (ratio.galinha || 1.41);
+    const el = spawnFx('chicken', 'assets/galinha.png', x - w * .97, y - h * .66, w);
+    void el.offsetWidth; el.classList.add('swing');
+    setTimeout(() => el.remove(), 400);
+  }
+  function pofAt(x, y) {
+    const el = spawnFx('pof', 'assets/pof.png', x, y, 190);
+    void el.offsetWidth; el.classList.add('show');
+    setTimeout(() => el.remove(), 500);
+  }
+  function floatText(txt, x, y) {
+    const el = spawnFx('float', null, x, y, 0); el.textContent = txt;
+    setTimeout(() => el.remove(), 750);
+  }
+
+  // Som (WebAudio, sem arquivos)
+  let actx;
+  function tone(f0, f1, dur, type = 'square', vol = .08) {
+    try {
+      actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+      if (actx.state === 'suspended') actx.resume();
+      const o = actx.createOscillator(), g = actx.createGain(), t = actx.currentTime;
+      o.type = type; o.frequency.setValueAtTime(f0, t); o.frequency.exponentialRampToValueAtTime(f1, t + dur);
+      g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(.0001, t + dur);
+      o.connect(g); g.connect(actx.destination); o.start(t); o.stop(t + dur);
+    } catch (e) {}
+  }
+  const squeak = () => { tone(900, 1700, .09, 'sawtooth', .07); setTimeout(() => tone(1500, 600, .16, 'sawtooth', .06), 70); };
+  const whoosh = () => tone(300, 120, .12, 'triangle', .05);
+  const ouch = () => tone(260, 90, .35, 'square', .06);
+  const buzz = n => { try { navigator.vibrate && navigator.vibrate(n); } catch (e) {} };
+
+  // Estado do jogo
+  const DURATION = 60;
+  let mode = 'intro', score = 0, lives = 3, startAt = 0, nextSpawn = 0, raf = 0, combo = 0;
+  let best = 0; try { best = +localStorage.getItem('semreuniao-best') || 0; } catch (e) {}
+
+  function hud() {
+    $('score').textContent = score.toLocaleString('pt-BR');
+    document.querySelectorAll('.cafe').forEach((c, i) => c.classList.toggle('lost', i >= lives));
+  }
+
+  // Tela inicial = a tela aprovada: os 4 nos mesmos cubículos, com balões e a galinhada
+  async function intro() {
+    await ready;
+    mode = 'intro';
+    [[0, 'p1'], [2, 'p2'], [3, 'p3'], [5, 'p4']].forEach(([i, c]) => popUp(holes[i], c));
+    const g = spawnFx('', 'assets/galinha.png', -45, 385, 290); g.id = 'introChicken'; g.style.transform = 'rotate(-4deg)';
+    const p = spawnFx('', 'assets/pof.png', 228, 432, 175); p.id = 'introPof';
+    $('score').textContent = '1.250'; $('time').textContent = '0:42';
+  }
+
+  function start() {
+    if (mode === 'play') return;
+    tone(500, 900, .15, 'square', .06);
+    ['introChicken', 'introPof'].forEach(id => $(id) && $(id).remove());
+    holes.forEach(goDown);
+    $('end').classList.remove('show');
+    $('jogar').classList.add('hide'); $('jogar').classList.remove('pulse');
+    score = 0; lives = 3; combo = 0; hud();
+    $('time').textContent = '1:00'; $('time').classList.remove('hurry');
+    $('hint').classList.add('show'); setTimeout(() => $('hint').classList.remove('show'), 2200);
+    mode = 'play';
+    startAt = performance.now(); nextSpawn = startAt + 700;
+    cancelAnimationFrame(raf); raf = requestAnimationFrame(loop);
+  }
+
+  function loop(now) {
+    if (mode !== 'play') return;
+    const el = (now - startAt) / 1000, left = Math.max(0, DURATION - el);
+    const sec = Math.ceil(left);
+    $('time').textContent = `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`;
+    $('time').classList.toggle('hurry', left <= 10);
+
+    const upTime = Math.max(650, 1500 - el * 14);   // fica mais rápido com o tempo
+    const gap = Math.max(380, 1000 - el * 11);
+    const maxUp = el < 15 ? 2 : el < 35 ? 3 : 4;
+
+    // Quem ficou tempo demais em pé "te puxa pra reunião"
+    holes.forEach(h => {
+      if (h.state === 'up' && now - h.t > upTime) { goDown(h); miss(h); }
+    });
+
+    if (now >= nextSpawn) {
+      const free = holes.filter(h => h.state === 'idle');
+      const up = holes.filter(h => h.state !== 'idle');
+      if (free.length && up.length < maxUp) {
+        const used = up.map(h => h.char);
+        const pool = CHARS.filter(c => !used.includes(c));
+        const char = (pool.length ? pool : CHARS)[Math.floor(Math.random() * (pool.length || 4))];
+        popUp(free[Math.floor(Math.random() * free.length)], char);
+      }
+      nextSpawn = now + gap * (0.7 + Math.random() * 0.6);
+    }
+
+    if (left <= 0) return end(true);
+    raf = requestAnimationFrame(loop);
+  }
+
+  function miss(h) {
+    combo = 0; lives--; hud(); ouch(); buzz([60, 40, 60]);
+    stage.classList.remove('shake'); void stage.offsetWidth; stage.classList.add('shake');
+    floatText('CALL!', h.cx, h.mon - 60);
+    if (lives <= 0) end(false);
+  }
+
+  function hit(h, x, y) {
+    h.state = 'bonk';
+    h.img.src = `assets/${h.char}-bonk.png`;
+    h.bubble.classList.remove('show');
+    h.el.classList.add('bonk');
+    const fast = performance.now() - h.t < 450;
+    combo++;
+    const pts = 100 + (fast ? 50 : 0) + Math.min(combo - 1, 5) * 20;
+    score += pts; hud();
+    const b = box(h);
+    pofAt(Math.min(Math.max(x, b.left + 60), b.right - 60), b.top + 40);
+    floatText('+' + pts, h.cx, b.top - 30);
+    squeak(); buzz(25);
+    setTimeout(() => goDown(h), 420);
+  }
+
+  function end(survived) {
+    mode = 'end'; cancelAnimationFrame(raf);
+    holes.forEach(h => h.state !== 'idle' && goDown(h));
+    const rec = score > best; if (rec) { best = score; try { localStorage.setItem('semreuniao-best', best); } catch (e) {} }
+    $('endTitle').textContent = survived ? 'SOBREVIVEU AO DIA!' : 'REUNIÃO MARCADA!';
+    $('endMsg').textContent = survived ? 'Nenhuma call rapidinha te pegou hoje.' : 'Te puxaram pra uma call de 2 horas que podia ser um e-mail.';
+    $('endScore').textContent = score.toLocaleString('pt-BR');
+    $('endRec').textContent = rec && score > 0 ? 'NOVO RECORDE!' : 'recorde: ' + best.toLocaleString('pt-BR');
+    setTimeout(() => {
+      $('end').classList.add('show');
+      $('jogar').classList.remove('hide'); $('jogar').classList.add('pulse');
+    }, 450);
+    tone(survived ? 520 : 400, survived ? 1040 : 150, .5, 'triangle', .08);
+  }
+
+  // Toque: coordenadas da tela → coordenadas do palco; área de acerto generosa
+  function toStage(e) {
+    const r = stage.getBoundingClientRect(), s = r.width / W;
+    return { x: (e.clientX - r.left) / s, y: (e.clientY - r.top) / s };
+  }
+  stage.addEventListener('pointerdown', e => {
+    if (e.target.id === 'jogar') return;
+    e.preventDefault();
+    if (mode !== 'play') return;
+    const { x, y } = toStage(e);
+    chickenAt(x, y);
+    let target = null, bestD = Infinity;
+    holes.forEach(h => {
+      if (h.state !== 'up') return;
+      const b = box(h), pad = 40;
+      if (x > b.left - pad && x < b.right + pad && y > b.top - pad && y < h.mon + 50) {
+        const d = Math.hypot(x - h.cx, y - (b.top + 90));
+        if (d < bestD) { bestD = d; target = h; }
+      }
+    });
+    if (target) hit(target, x, y); else { whoosh(); combo = 0; }
+  }, { passive: false });
+
+  $('jogar').addEventListener('click', start);
+  document.addEventListener('contextmenu', e => e.preventDefault());
+  document.addEventListener('gesturestart', e => e.preventDefault());
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden && mode === 'play') end(false);
+  });
+
+  intro();
+</script>
+</body>
+</html>
